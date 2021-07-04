@@ -8,10 +8,6 @@
 #include "SB1602E.h"
 #include "RCS620S.h"
 
-// Blinking rate in milliseconds
-#define BLINKING_RATE     500ms
-
-
 // RCS620S
 #define PUSH_TIMEOUT                  2100
 #define COMMAND_TIMEOUT               400
@@ -234,34 +230,6 @@ void parse_history(uint8_t *buf)
     // tp.printf("%s", info);
     // tp.clearDoubleSizeWidth();
 }
-
-#if 0
-int main()
-{
-    // Initialise the digital pin LED1 as an output
-    DigitalOut led(LED1);
-    int cnt = 0;
-
-    lcd.setCharsInLine(8);
-    lcd.clear();
-    lcd.contrast(0x35);
-    lcd.printf(0, 0, (char*)"FeliCa");
-    lcd.printf(0, 1, (char*)"Reader");
-
-    rcs620s.initDevice();
-
-    serial.init();
-    serial.connect();
-    serial.printf("Hello, Raspberry Pi pico!\n");
-    serial.printf("Build: %s %s\n\n", __DATE__, __TIME__);
-
-    while (true) {
-        serial.printf("cnt = %d\n", cnt++);
-        led = !led;
-        ThisThread::sleep_for(BLINKING_RATE);
-    }
-}
-#endif
 
 int main()
 {

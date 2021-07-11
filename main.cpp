@@ -35,7 +35,7 @@ void get_station(char *buf, int line, int station);
 const int record_length = (3 + 40 + 40);
 
 DigitalOut led(LED1);
-USBSerial serial(true);
+USBSerial serial(false);
 SB1602E lcd(I2C_LCD_SDA, I2C_LCD_SCL);
 RCS620S rcs620s(RCS620S_TX, RCS620S_RX);
 AS289R2 tp(AS289R2_TX, AS289R2_RX);
@@ -389,8 +389,8 @@ void parse_history(uint8_t *buf)
     }
 
     sprintf(info, "処理日付: %d/%02d/%02d", 2000+(buf[4]>>1), ((buf[4]&1)<<3 | ((buf[5]&0xe0)>>5)), buf[5]&0x1f);
-    if (buf[1] == 0x46) {   // 物販
-        sprintf(info2, " %02d:%02d:%02d", (buf[6] & 0xF8) >> 3, ((buf[6] & 0x7) >> 5) | ((buf[7] & 0xe0) >> 5), (buf[7] & 0x1f));
+    if (buf[1] == 0x46 || buf[1] == 0xc6) {   // 物販
+        sprintf(info2, " %02d:%02d:%02d", (buf[6] & 0xF8) >> 3, ((buf[6] & 0x7) << 3) | ((buf[7] & 0xe0) >> 5), (buf[7] & 0x1f));
         strcat(info, info2);
     }
     strcat(info, "\r");

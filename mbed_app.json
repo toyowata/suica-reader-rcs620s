@@ -1,0 +1,57 @@
+{
+    "target_overrides": {
+        "*": {
+            "platform.stdio-baud-rate"                  : 115200,
+            "platform.stdio-convert-newlines"           : true,
+            "platform.stdio-buffered-serial"            : true,
+            "platform.stdio-flush-at-exit"              : true
+        },
+        "RASPBERRY_PI_PICO": {
+            "RCS620S-TX"                                : "p16",
+            "RCS620S-RX"                                : "p17",
+            "AS289R2-TX"                                : "p4",
+            "AS289R2-RX"                                : "p5",
+            "LCD-SCL"                                   : "p15",
+            "LCD-SDA"                                   : "p14"
+        },
+        "SSCI824": {
+            "platform.stdio-baud-rate"                  : 9600,
+            "RCS620S-TX"                                : "dp16",
+            "RCS620S-RX"                                : "P0_15",
+            "AS289R2-TX"                                : "dp17",
+            "AS289R2-RX"                                : "dp18"
+        }
+    },
+    "config": {
+        "RCS620S-TX": {
+            "help"      : "RCS620S TX pin name",
+            "value"     : "D1",
+            "macro_name": "RCS620S_TX"
+        },
+        "RCS620S-RX": {
+            "help"      : "RCS620S TX pin name",
+            "value"     : "D0",
+            "macro_name": "RCS620S_RX"
+        },
+        "AS289R2-TX": {
+            "help"      : "AS289R2 TX pin name",
+            "value"     : "D1",
+            "macro_name": "AS289R2_TX"
+        },
+        "AS289R2-RX": {
+            "help"      : "AS289R2 RX pin name",
+            "value"     : "D0",
+            "macro_name": "AS289R2_RX"
+        },
+        "LCD-SCL": {
+            "help"      : "I2C character LCD SCL pin name",
+            "value"     : "SCL",
+            "macro_name": "I2C_LCD_SCL"
+        },
+        "LCD-SDA": {
+            "help"      : "I2C character LCD SDA pin name",
+            "value"     : "SDA",
+            "macro_name": "I2C_LCD_SDA"
+        }
+    }
+}

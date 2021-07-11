@@ -35,7 +35,7 @@ void get_station(char *buf, int line, int station);
 const int record_length = (3 + 40 + 40);
 
 DigitalOut led(LED1);
-USBSerial serial(false);
+USBSerial serial(true);
 SB1602E lcd(I2C_LCD_SDA, I2C_LCD_SCL);
 RCS620S rcs620s(RCS620S_TX, RCS620S_RX);
 AS289R2 tp(AS289R2_TX, AS289R2_RX);

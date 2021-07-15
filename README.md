@@ -27,7 +27,7 @@ Pasberry Pi picoと他の部品は以下のように接続してください。
 
 |Rasberry Pi pico|RC-S602S|I2C LCD|AS-289R2|
 |---|---|---|---|
-|GPIO6 (pin 4)|||RxD1 (D1)|
+|GPIO4 (pin 6)|||RxD1 (D1)|
 |VSYS (pin 39)|||5V|
 |3V3(OUT) (pin 36)|VDD (pin 1)|VDD (pin 2)||
 |GND (pin 38)|GND (pin 4, 6)|GND (pin 3)|GND|

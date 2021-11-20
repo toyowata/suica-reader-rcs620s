@@ -30,6 +30,7 @@ int requestService(uint16_t serviceCode);
 int readEncryption(uint16_t serviceCode, uint8_t blockNumber, uint8_t *buf);
 void printBalanceLCD(const char *card_name, uint32_t balance);
 void parse_history(uint8_t *buf);
+void parse_history_nanaco(uint8_t *buf);
 void get_station(char *buf, int line, int station);
 
 const int record_length = (3 + 40 + 40);
@@ -93,32 +94,35 @@ int main()
         // 共通領域
         else if(rcs620s.polling(COMMON_SYSTEM_CODE)){
             // Edy
-            if(requestService(EDY_SERVICE_CODE)){
-            if(readEncryption(EDY_SERVICE_CODE, 0, buf)){
+            if(requestService(EDY_SERVICE_CODE) && readEncryption(EDY_SERVICE_CODE, 0, buf)) {
                 // Big Endianで入っているEdyの残高を取り出す
                 balance = buf[26];                  // 14 byte目
                 balance = (balance << 8) + buf[27]; // 15 byte目
                 // 残高表示
                 printBalanceLCD("Edy", balance);
             }
-            }
             
             // nanaco
-            if(requestService(NANACO_SERVICE_CODE)){
-            if(readEncryption(NANACO_SERVICE_CODE, 0, buf)){
+            if(requestService(NANACO_SERVICE_CODE) && readEncryption(NANACO_SERVICE_CODE, 0, buf)) {
                 // Big Endianで入っているNanacoの残高を取り出す
-                balance = buf[17];                  // 5 byte目
-                balance = (balance << 8) + buf[18]; // 6 byte目
-                balance = (balance << 8) + buf[19]; // 7 byte目
-                balance = (balance << 8) + buf[20]; // 8 byte目
+                balance = buf[19];                   // 8 byte目
+                balance = (balance << 8) + buf[20];  // 9 byte目
                 // 残高表示
                 printBalanceLCD("nanaco", balance);
-            }
+                
+                for (int i = (5 - 1); i >= 0; i--) {
+                    //if (buffer[i][0] != 0) {
+                        readEncryption(NANACO_SERVICE_CODE, i, buf);
+                        parse_history_nanaco(buf);
+                    //}
+                }
+
+                //parse_history_nanaco(buf);
+
             }
             
             // waon
-            if(requestService(WAON_SERVICE_CODE)){
-            if(readEncryption(WAON_SERVICE_CODE, 1, buf)){
+            if(requestService(WAON_SERVICE_CODE) && readEncryption(WAON_SERVICE_CODE, 1, buf)) {
                 // Big Endianで入っているWaonの残高を取り出す
                 balance = buf[17];                  // 21 byte目
                 balance = (balance << 8) + buf[18]; // 22 byte目
@@ -127,7 +131,6 @@ int main()
                 balance = balance >> 5;             // 5bit分ビットシフト
                 // 残高表示
                 printBalanceLCD("waon", balance);
-            }
             }
         }
                 
@@ -402,6 +405,71 @@ void parse_history(uint8_t *buf)
     tp.setDoubleSizeWidth();
     tp.printf("%s", info);
     tp.clearDoubleSizeWidth();
+}
+
+void parse_history_nanaco(uint8_t *buf)
+{
+    char info[80], info2[10];
+    uint16_t tmp;
+
+    serial.printf("\n");
+    for(int i = 0; i < RCS620S_MAX_CARD_RESPONSE_LEN-2; i++) {
+        serial.printf("%02X ", buf[i]);
+    }
+    serial.printf("\n");
+
+    sprintf(info, "種別: ");
+    if (buf[12] == 0x47) {
+        strcat(info, "支払い\n");
+    }
+    if (buf[12] == 0x6F) {
+        strcat(info, "チャージ\n");
+    }
+    serial.printf(info);
+
+    /*
+    tmp = buf[25];
+    tmp = (tmp << 8) + buf[26];
+    serial.printf("No. %d\n", tmp);
+    */
+    
+    tmp = buf[21];
+    tmp = (tmp << 8) + buf[22];
+    tmp = (tmp >> 5) & 0x07FF;
+    sprintf(info, "日時: %d年", 2000+tmp);
+    
+    tmp = buf[22] & 0x1E;
+    tmp = (tmp >> 1);
+    sprintf(info2, "%02d月", tmp);
+    strcat(info, info2);
+
+    tmp = buf[22];
+    tmp = (tmp << 8) + buf[23];
+    tmp = (tmp >> 4) & 0x001F;
+    sprintf(info2, "%02d日 ", tmp);
+    strcat(info, info2);
+
+    tmp = buf[23];
+    tmp = (tmp << 8) + buf[24];
+    tmp = (tmp >> 6) & 0x3F;
+    sprintf(info2, "%02d:", tmp);
+    strcat(info, info2);
+
+    tmp = buf[24];
+    tmp = tmp & 0x3F;
+    sprintf(info2, "%02d\n", tmp);
+    strcat(info, info2);
+    serial.printf(info);
+
+    tmp = buf[15];
+    tmp = (tmp << 8) + buf[16];
+    sprintf(info, "取扱金額: %d円\n", tmp);
+    serial.printf(info);
+
+    tmp = buf[19];
+    tmp = (tmp << 8) + buf[20];
+    sprintf(info, "残高: %d円\n", tmp);
+    serial.printf(info);
 }
 
 int requestService(uint16_t serviceCode){

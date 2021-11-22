@@ -1,5 +1,5 @@
 /* mbed Microcontroller Library
- * Copyright (c) 2019 ARM Limited
+ * Copyright (c) 2019-2021 ARM Limited
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -31,7 +31,7 @@ int readEncryption(uint16_t serviceCode, uint8_t blockNumber, uint8_t *buf);
 void printBalanceLCD(const char *card_name, uint32_t balance);
 void parse_history(uint8_t *buf);
 void parse_history_nanaco(uint8_t *buf);
-void get_station(char *buf, int line, int station);
+void get_station_name(char *buf, int area, int line, int station);
 
 const int record_length = (3 + 40 + 40);
 
@@ -110,15 +110,11 @@ int main()
                 // 残高表示
                 printBalanceLCD("nanaco", balance);
                 
-                for (int i = (5 - 1); i >= 0; i--) {
-                    //if (buffer[i][0] != 0) {
-                        readEncryption(NANACO_SERVICE_CODE, i, buf);
-                        parse_history_nanaco(buf);
-                    //}
+                for (int i = 5; i > 0; i--) {
+                        if (readEncryption(NANACO_SERVICE_CODE, i-1, buf)) {
+                            parse_history_nanaco(buf);
+                        }
                 }
-
-                //parse_history_nanaco(buf);
-
             }
             
             // waon
@@ -293,12 +289,12 @@ void parse_history(uint8_t *buf)
             break;
     }
     if (hasStationName >= 1) {
-        get_station(info2, line_in, station_in);
+        get_station_name(info2, region_in, line_in, station_in);
         strcat(info, info2);
     }
     if (hasStationName == 2) {
         strcat(info, " - ");
-        get_station(info2, line_out, station_out);
+        get_station_name(info2, region_out, line_out, station_out);
         strcat(info, info2);
     }
     serial.printf("%s\r", info);
@@ -379,12 +375,12 @@ void parse_history(uint8_t *buf)
                 break;
         }
         if (hasStationName >= 1) {
-            get_station(info2, line_in, station_in);
+            get_station_name(info2, region_in, line_in, station_in);
             strcat(info, info2);
         }
         if (hasStationName == 2) {
             strcat(info, " - ");
-            get_station(info2, line_out, station_out);
+            get_station_name(info2, region_out, line_out, station_out);
             strcat(info, info2);
         }
         serial.printf("%s\r", info);
@@ -420,18 +416,12 @@ void parse_history_nanaco(uint8_t *buf)
 
     sprintf(info, "種別: ");
     if (buf[12] == 0x47) {
-        strcat(info, "支払い\n");
+        strcat(info, "支払い");
     }
     if (buf[12] == 0x6F) {
-        strcat(info, "チャージ\n");
+        strcat(info, "チャージ");
     }
-    serial.printf(info);
-
-    /*
-    tmp = buf[25];
-    tmp = (tmp << 8) + buf[26];
-    serial.printf("No. %d\n", tmp);
-    */
+    serial.printf("%s\n", info);
     
     tmp = buf[21];
     tmp = (tmp << 8) + buf[22];
@@ -457,19 +447,19 @@ void parse_history_nanaco(uint8_t *buf)
 
     tmp = buf[24];
     tmp = tmp & 0x3F;
-    sprintf(info2, "%02d\n", tmp);
+    sprintf(info2, "%02d", tmp);
     strcat(info, info2);
-    serial.printf(info);
+    serial.printf("%s\r", info);
 
     tmp = buf[15];
     tmp = (tmp << 8) + buf[16];
-    sprintf(info, "取扱金額: %d円\n", tmp);
-    serial.printf(info);
+    sprintf(info, "取扱金額: %d円", tmp);
+    serial.printf("%s\r", info);
 
     tmp = buf[19];
     tmp = (tmp << 8) + buf[20];
-    sprintf(info, "残高: %d円\n", tmp);
-    serial.printf(info);
+    sprintf(info, "残高: %d円", tmp);
+    serial.printf("%s\r", info);
 }
 
 int requestService(uint16_t serviceCode){
@@ -523,24 +513,23 @@ void printBalanceLCD(const char *card_name, uint32_t balance)
     lcd.printf(0, 1, (char*)"\\ %d", balance);
 }
 
-void get_station(char *buf, int line, int station) {
+void get_station_name(char *buf, int area, int line, int station) {
     unsigned int offset = 0;
     while(1) {
-        if (sc_utf8[1 + offset] == line) {
-            if (sc_utf8[2 + offset] == station) {
-                sprintf(buf, "%s線 %s駅", &sc_utf8[3 + offset], &sc_utf8[3 + 40 + offset]);
-                break;
-            }
-            else {
-                offset += record_length;
-            }
+        if (sc_utf8[0 + offset] == area &&
+            sc_utf8[1 + offset] == line &&
+            sc_utf8[2 + offset] == station) {
+            sprintf(buf, "%s線 %s駅", &sc_utf8[3 + offset], &sc_utf8[3 + 40 + offset]);
+            break;
         }
         else {
             offset += record_length;
         }
+
         if (offset > sc_utf8_len) {
             sprintf(buf, "---");
             break;
         }
     }
 }
+

@@ -22,7 +22,9 @@
 #define PASSNET_SERVICE_CODE          0x090F
 #define EDY_SERVICE_CODE              0x170F
 #define NANACO_SERVICE_CODE           0x564F
-#define WAON_SERVICE_CODE             0x680B
+#define WAON_SERVICE_CODE0            0x680B
+#define WAON_SERVICE_CODE1            0x6817
+#define WAON_SERVICE_CODE2            0x684B
 
 #define PRINT_ENTRIES                 20    // Max. 20
 
@@ -33,7 +35,7 @@ void parse_history(uint8_t *buf);
 void parse_history_nanaco(uint8_t *buf);
 void get_station_name(char *buf, int area, int line, int station);
 
-const int record_length = (3 + 40 + 40);
+const uint32_t record_length = (3 + 40 + 40);
 
 DigitalOut led(LED1);
 USBSerial serial(true);
@@ -118,15 +120,134 @@ int main()
             }
             
             // waon
-            if(requestService(WAON_SERVICE_CODE) && readEncryption(WAON_SERVICE_CODE, 1, buf)) {
-                // Big Endianで入っているWaonの残高を取り出す
-                balance = buf[17];                  // 21 byte目
-                balance = (balance << 8) + buf[18]; // 22 byte目
-                balance = (balance << 8) + buf[19]; // 23 byte目
-                balance = balance & 0x7FFFE0;       // 残高18bit分のみ論理積で取り出す
-                balance = balance >> 5;             // 5bit分ビットシフト
+            if(requestService(WAON_SERVICE_CODE1) && readEncryption(WAON_SERVICE_CODE1, 0, buf)) {
+                #if 0
+                serial.printf("\n");
+                for(int i = 0; i < RCS620S_MAX_CARD_RESPONSE_LEN-2; i++) {
+                    serial.printf("%02X ", buf[i]);
+                }
+                serial.printf("\n");
+                #endif
+                // Little Endianで入っているwaonの残高を取り出す
+                balance = buf[13];
+                balance = (balance << 8) + buf[12];
                 // 残高表示
                 printBalanceLCD("waon", balance);
+                serial.printf("残高: %ld円\n", balance);
+
+                int next_valid = 0;
+                uint32_t tmp;
+                if(requestService(WAON_SERVICE_CODE0) && readEncryption(WAON_SERVICE_CODE0, 0, buf)) {
+                    for (int blk = 0; blk < 6; blk++) {
+                        if (readEncryption(WAON_SERVICE_CODE0, blk, buf)) {
+                            #if 0
+                            for(int i = 12; i < RCS620S_MAX_CARD_RESPONSE_LEN-2; i++) {
+                                serial.printf("%02X ", buf[i]);
+                            }
+                            serial.printf("\n");
+                            #else
+                            if (!next_valid) {
+                                serial.printf("------\n");
+                            }
+                            #endif
+                        }
+                        if (next_valid) {
+
+                            tmp = buf[12 + 2];
+                            tmp = ((tmp >> 3) & 0x1F) + 2005;
+                            serial.printf("%ld年", tmp);
+
+                            tmp = buf[12 + 2];
+                            tmp = ((tmp & 0x7) << 1) + ((buf[12 + 3] >> 7 ) & 0x01);
+                            serial.printf("%2ld月", tmp);
+
+                            tmp = ((buf[12 + 3] >> 2) & 0x1F);
+                            serial.printf("%2ld日 ", tmp);
+
+                            tmp = ((buf[12 + 3] << 3 ) & 0x18);
+                            tmp = tmp + ((buf[12 + 4] >> 5) & 0x7);
+                            serial.printf("%02ld:", tmp);
+
+                            tmp = (buf[12 + 4] & 0x1F);
+                            tmp = (tmp << 1) + ((buf[12 + 5] >> 7) & 0x01);
+                            serial.printf("%02ld ", tmp);
+
+                            tmp = (buf[12 + 5] & 0x7F);
+                            tmp = (tmp << 8) + buf[12 + 6];
+                            tmp = (tmp << 3) + ((buf[12 + 7] & 0xE0) >> 5);
+                            serial.printf("残高%5ld円, ", tmp);
+
+                            tmp = buf[12 + 7] & 0x1F;
+                            tmp = (tmp << 8) + buf[12 + 8];
+                            tmp = (tmp << 5) + ((buf[12 + 9] & 0xF8) >> 3);
+                            serial.printf("利用額%5ld円, ", tmp);
+
+                            tmp = buf[12 + 9] & 0x07;
+                            tmp = (tmp << 8) + buf[12 + 10];
+                            tmp = (tmp << 6) + ((buf[12 + 11] & 0xFC) >> 2);
+                            serial.printf("チャージ額%5ld円 ", tmp);
+
+                            serial.printf("利用種別:");
+                            tmp = buf[12 + 1];
+                            switch (tmp) {
+                                case 0x04:
+                                    serial.printf("支払い");
+                                    break;
+                                case 0x08:
+                                    serial.printf("返品");
+                                    break;
+                                case 0x0C:
+                                    serial.printf("チャージ(現金、ポイントチャージ)");
+                                    break;
+                                case 0x10:
+                                    serial.printf("チャージ");
+                                    break;
+                                case 0x18:
+                                    serial.printf("ポイントダウンロード");
+                                    break;
+                                case 0x28:
+                                    serial.printf("返金");
+                                    break;
+                                case 0x1C:
+                                    serial.printf("購入時にオートチャージ");
+                                    break;
+                                case 0x20:
+                                    serial.printf("購入時にオートチャージ");
+                                    break;
+                                case 0x30:
+                                    serial.printf("オートチャージ(銀行)");
+                                    break;
+                                case 0x3C:
+                                    serial.printf("新カードへの移行");
+                                    break;
+                                case 0x7C:
+                                    serial.printf("ポイント交換(預入)");
+                                    break;
+                            }
+                            serial.printf("\n");
+                        }
+                        uint32_t num;
+                        num = buf[12 + 13];
+                        num = (num << 8) + buf[12 + 14];
+                        if (num != 0) {
+                            serial.printf("端末番号: ");
+                            for(int c = 0; c <= 0xC; c++) {
+                                serial.printf("%c", buf[12+c]);
+                            }
+                            serial.printf(", 利用連番: %ld\n", num);
+                            next_valid = 1;
+                        }
+                        else {
+                            next_valid = 0;
+                        }
+                    }
+                }
+                if(requestService(WAON_SERVICE_CODE2) && readEncryption(WAON_SERVICE_CODE2, 0, buf)) {
+                    tmp = buf[12 + 0];
+                    tmp = (tmp << 8) + buf[12 + 1];
+                    tmp = (tmp << 8) + buf[12 + 2];
+                    serial.printf("%x年%x月%x日 ポイント残高 %ldpt\n", buf[12 + 11], buf[12 + 12], buf[12 + 13], tmp);
+                }
             }
         }
                 
@@ -408,12 +529,15 @@ void parse_history_nanaco(uint8_t *buf)
     char info[80], info2[10];
     uint16_t tmp;
 
+#if 0
     serial.printf("\n");
     for(int i = 0; i < RCS620S_MAX_CARD_RESPONSE_LEN-2; i++) {
         serial.printf("%02X ", buf[i]);
     }
     serial.printf("\n");
-
+#else
+    serial.printf("-----\n");
+#endif
     sprintf(info, "種別: ");
     if (buf[12] == 0x47) {
         strcat(info, "支払い");
@@ -526,8 +650,8 @@ void get_station_name(char *buf, int area, int line, int station) {
             offset += record_length;
         }
 
-        if (offset > sc_utf8_len) {
-            sprintf(buf, "---");
+        if (offset >= sc_utf8_len) {
+            sprintf(buf, "***");
             break;
         }
     }

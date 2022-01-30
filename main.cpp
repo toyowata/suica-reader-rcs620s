@@ -30,6 +30,7 @@
 #define NANACO_SERVICE_CODE           0x564F
 #define NANACO_ID_CODE                0x558B
 #define NANACO_BALANCE_CODE           0x5597
+#define NANACO_POINT_CODE             0x560B
 
 #define WAON_SERVICE_CODE0            0x680B
 #define WAON_SERVICE_CODE1            0x6817
@@ -80,7 +81,7 @@ int main()
     memset(idm, 0, 8);
 
     while (1) {
-        uint32_t balance;
+        uint32_t balance = 0;
         uint8_t buf[RCS620S_MAX_CARD_RESPONSE_LEN];
         int isCaptured = 0;
         
@@ -95,10 +96,15 @@ int main()
                         memcpy(buffer[i], &buf[12], 16);
                     }
                 }
-                if (memcmp(idm, buf+1, 8) != 0) {
+                if (memcmp(idm, buf + 1, 8) != 0) {
                     // カード変更
                     isCaptured = 1;
-                    memcpy(idm, buf+1, 8);
+                    memcpy(idm, buf + 1, 8);
+#if 1
+                    char info[40];
+                    snprintf(info, sizeof(info), "IDm: %02x%02x-%02x%02x-%02x%02x-%02x%02x", idm[0], idm[1], idm[2], idm[3], idm[4], idm[5], idm[6], idm[7]);
+                    serial.printf("%s\n", info);
+#endif
                 }
                 else {
                     // 前と同じカード
@@ -125,21 +131,25 @@ int main()
         else if (rcs620s.polling(COMMON_SYSTEM_CODE)){
             // Edy
             if (requestService(EDY_ATTRIBUTE_CODE) && readEncryption(EDY_ATTRIBUTE_CODE, 0, buf)) {                    
-                if (memcmp(idm, &buf[12+2], 8) != 0) {
+                if (memcmp(idm, &buf[12 + 2], 8) != 0) {
                     isCaptured = 1;
-                    memcpy(idm, &buf[12+2], 8);
+                    memcpy(idm, &buf[12 + 2], 8);
                 }
                 else {
                     isCaptured = 0;
                 }
                 if (requestService(EDY_ATTRIBUTE_CODE) && readEncryption(EDY_ATTRIBUTE_CODE, 0, buf) && isCaptured) {                    
-                    serial.printf("Edy ID: %02x%02x-%02x%02x-%02x%02x-%02x%02x\n", buf[12+2], buf[12+3], buf[12+4], buf[12+5], buf[12+6], buf[12+7], buf[12+8], buf[12+9]);
+                    char info[80];
+                    snprintf(info, sizeof(info), "Edy ID: %02x%02x-%02x%02x-%02x%02x-%02x%02x", buf[12+2], buf[12+3], buf[12+4], buf[12+5], buf[12+6], buf[12+7], buf[12+8], buf[12+9]);
+                    serial.printf("%s\n", info);
+                    tp.printf("%s\r", info);
+                    
                     int tmp;
-                    tmp = buf[12+10];
+                    tmp = buf[12 + 10];
                     int day = ((tmp << 8) + buf[12+11]) >> 1;
-                    int sec = ((buf[12+11] & 1) << 16) + (buf[12+12] << 8) + buf[12+13];
+                    int sec = ((buf[12 + 11] & 1) << 16) + (buf[12 + 12] << 8) + buf[12 + 13];
 
-                    struct tm tm, *tp;
+                    struct tm tm, *pt;
                     time_t t = (time_t)(-1);
                     tm.tm_year = 2000 - 1900;
                     tm.tm_mon = 1 - 1;
@@ -148,34 +158,68 @@ int main()
                     tm.tm_min = 0;
                     tm.tm_sec = sec;
                     t = mktime(&tm);
-                    tp = localtime(&t);
-                    serial.printf("発行日: %d年%d月%d日 %02d:%02d:%02d\n", tp->tm_year+1900, tp->tm_mon+1, tp->tm_mday, tp->tm_hour, tp->tm_min, tp->tm_sec);
-                }
-                for (int i = 5; i >= 0; i--) {
-                    if (requestService(EDY_HISTORY_CODE) && readEncryption(EDY_HISTORY_CODE, i, buf) && isCaptured) {
-                        parse_history_edy(buf);
-                    }
+                    pt = localtime(&t);
+                    snprintf(info, sizeof(info), "発行日: %d年%d月%d日 %02d:%02d", pt->tm_year+1900, pt->tm_mon+1, pt->tm_mday, pt->tm_hour, pt->tm_min);
+                    serial.printf("%s\n", info);
+                    tp.printf("%s\r", info);
                 }
                 if (requestService(EDY_SERVICE_CODE) && readEncryption(EDY_SERVICE_CODE, 0, buf) && isCaptured) {
                     balance = buf[12 + 0];
                     balance += (buf[12 + 1] << 8);
                     balance += (buf[12 + 2] << 8);
                     balance += (buf[12 + 3] << 8);
-                    serial.printf("残高 %ld円\n", balance);
                     printBalanceLCD("Edy", balance);
+                }
+                if (isCaptured) {
+                    for (int i = 0; i < 6; i++) {
+                        if (readEncryption(EDY_HISTORY_CODE, i, buf) && isCaptured) {
+                            memcpy(buffer[i], &buf[12], 16);
+                        }
+                    }
+                    for (int i = 5; i >= 0; i--) {
+                        if (isCaptured) {
+                            parse_history_edy(&buffer[i][0]);
+                        }
+                    }
+                    tp.setDoubleSizeWidth();
+                    tp.printf("\r残高 %ld円\r\r", balance);
+                    tp.clearDoubleSizeWidth();
+                    tp.putLineFeed(3);
                 }
             }
             
             // nanaco
             if (requestService(NANACO_ID_CODE) && readEncryption(NANACO_ID_CODE, 0, buf)) {
                 if (memcmp(idm, &buf[12], 8) != 0) {
-                    isCaptured = 1;
+                    uint32_t point;
+                    char info[40];
                     memcpy(idm, &buf[12], 8);
+                    snprintf(info, sizeof(info), "nanaco ID: %02x%02x-%02x%02x-%02x%02x-%02x%02x", buf[12], buf[13], buf[14], buf[15], buf[16], buf[17], buf[18], buf[19]);
+                    serial.printf("%s\n", info);
+                    tp.printf("%s\r", info);
+                    readEncryption(NANACO_POINT_CODE, 1, buf);
+                    point = buf[12 + 1];
+                    point = (point << 8) + buf[12 + 2];
+                    snprintf(info, sizeof(info), "nanacoポイント: %ldpt", point);
+                    serial.printf("%s\n\n", info);
+                    tp.printf("%s\r\r", info);
+                    isCaptured = 1;
                 }
                 else {
                     isCaptured = 0;
                 }
             }
+#if 0
+            if (requestService(NANACO_POINT_CODE) && readEncryption(NANACO_POINT_CODE, 1, buf) && isCaptured) {
+                uint32_t point;
+                char info[40];
+                point = buf[12 + 1];
+                point = (point << 8) + buf[12 + 2];
+                snprintf(info, sizeof(info), "nanacoポイント: %ldpt", point);
+                serial.printf("%s\n\n", info);
+                tp.printf("%s\r\r", info);
+            }
+#endif
             if (requestService(NANACO_BALANCE_CODE) && readEncryption(NANACO_BALANCE_CODE, 0, buf) && isCaptured) {
                 // Little Endianで入っているnanacoの残高を取り出す
                 balance = buf[12 + 0];
@@ -186,17 +230,26 @@ int main()
                 printBalanceLCD("nanaco", balance);
                 
                 for (int i = 5; i > 0; i--) {
-                        if (readEncryption(NANACO_SERVICE_CODE, i-1, buf)) {
-                            parse_history_nanaco(buf);
-                        }
+                    if (readEncryption(NANACO_SERVICE_CODE, i-1, buf)) {
+                        parse_history_nanaco(buf);
+                    }
                 }
+                tp.printf("\r");
+                tp.setDoubleSizeWidth();
+                tp.printf("\r残高 %ld円\r\r", balance);
+                tp.clearDoubleSizeWidth();
+                tp.putLineFeed(3);
             }
             
             // waon
             if (requestService(WAON_SERVICE_ID) && readEncryption(WAON_SERVICE_ID, 0, buf)) {
                 if (memcmp(idm, &buf[12], 8) != 0) {
+                    char info[40];
                     isCaptured = 1;
                     memcpy(idm, &buf[12], 8);
+                    snprintf(info, sizeof(info), "WAON ID: %02x%02x-%02x%02x-%02x%02x-%02x%02x", buf[12], buf[13], buf[14], buf[15], buf[16], buf[17], buf[18], buf[19]);
+                    serial.printf("%s\n\n", info);
+                    tp.printf("%s\r\r", info);
                 }
                 else {
                     isCaptured = 0;
@@ -210,7 +263,13 @@ int main()
                 printBalanceLCD("waon", balance);
 
                 parse_history_waon(buf);
+
                 serial.printf("残高 %ld円\n", balance);
+                tp.setDoubleSizeWidth();
+                tp.printf("残高 %ld円\r\r", balance);
+                tp.clearDoubleSizeWidth();
+                tp.putLineFeed(3);
+
             }
         }
         rcs620s.rfOff();
@@ -231,6 +290,7 @@ void parse_history_suica(uint8_t *buf)
     station_in = buf[7];
     station_out = buf[9];
 
+    serial.printf("\n");
     for (int i = 0; i < 16; i++) {
         serial.printf("%02X ", buf[i]);
     }
@@ -302,7 +362,7 @@ void parse_history_suica(uint8_t *buf)
             break;
     }
     serial.printf("%s", info);
-    tp.printf("%s", info);
+    //tp.printf("%s", info);
 
     int hasStationName = 0;
     snprintf(info, sizeof(info), "利用種別: ");
@@ -464,10 +524,10 @@ void parse_history_suica(uint8_t *buf)
     serial.printf("%s", info);
     tp.printf("%s", info);
 
-    snprintf(info, sizeof(info), "残額: %d円\r\r", (buf[11]<<8) + buf[10]); 
+    snprintf(info, sizeof(info), "残額: %d円", (buf[11]<<8) + buf[10]); 
     serial.printf("%s\n", info);
     tp.setDoubleSizeWidth();
-    tp.printf("%s", info);
+    tp.printf("%s\r\r", info);
     tp.clearDoubleSizeWidth();
 }
 
@@ -476,7 +536,11 @@ void parse_history_nanaco(uint8_t *buf)
     char info[80], info2[10];
     uint16_t tmp;
 
-#if 0
+    if (buf[12] == 0) {
+        return;
+    }
+
+#if 1
     serial.printf("\n");
     for (int i = 0; i < RCS620S_MAX_CARD_RESPONSE_LEN-2; i++) {
         serial.printf("%02X ", buf[i]);
@@ -484,15 +548,23 @@ void parse_history_nanaco(uint8_t *buf)
     serial.printf("\n");
 #else
     serial.printf("-----\n");
+    tp.printf("\r");
 #endif
     snprintf(info, sizeof(info), "種別: ");
+    if (buf[12] == 0x35) {
+        strcat(info, "引継");
+    }
     if (buf[12] == 0x47) {
         strcat(info, "支払い");
     }
-    if (buf[12] == 0x6F) {
+    if (buf[12] == 0x6F || buf[12] == 0x70) {
         strcat(info, "チャージ");
     }
+    if (buf[12] == 0x83) {
+        strcat(info, "ポイント交換チャージ");
+    }
     serial.printf("%s\n", info);
+    tp.printf("%s\r", info);
     
     tmp = buf[21];
     tmp = (tmp << 8) + buf[22];
@@ -521,16 +593,19 @@ void parse_history_nanaco(uint8_t *buf)
     snprintf(info2, sizeof(info2), "%02d", tmp);
     strcat(info, info2);
     serial.printf("%s\r", info);
+    tp.printf("%s\r", info);
 
     tmp = buf[15];
     tmp = (tmp << 8) + buf[16];
     snprintf(info, sizeof(info), "取扱金額: %d円", tmp);
     serial.printf("%s\r", info);
+    tp.printf("%s\r", info);
 
     tmp = buf[19];
     tmp = (tmp << 8) + buf[20];
     snprintf(info, sizeof(info), "残高: %d円", tmp);
     serial.printf("%s\r", info);
+    tp.printf("%s\r", info);
 }
 
 void parse_history_waon(uint8_t *buf)
@@ -575,9 +650,10 @@ void parse_history_waon(uint8_t *buf)
                     snprintf(info2, sizeof(info2), "%c", buf[12 + ch]);
                     strcat(info, info2);
                 }
-                snprintf(info2, sizeof(info2), ", 利用連番: %ld\n", tmp);
+                snprintf(info2, sizeof(info2), " (%ld)\r", tmp);
                 strcat(info, info2);
                 serial.printf("%s", info);
+                tp.printf("%s", info);
                 next_valid = 1;
             }
             else {
@@ -585,55 +661,7 @@ void parse_history_waon(uint8_t *buf)
             }
         }
         if (next_valid && readEncryption(WAON_SERVICE_CODE0, array[i] + 1, buf)) {
-            tmp = buf[12 + 2];
-            tmp = ((tmp >> 3) & 0x1F) + 2005;
-            snprintf(info, sizeof(info), "%ld年", tmp);
-
-            tmp = buf[12 + 2];
-            tmp = ((tmp & 0x7) << 1) + ((buf[12 + 3] >> 7 ) & 0x01);
-            snprintf(info2, sizeof(info2), "%2ld月", tmp);
-            strcat(info, info2);
-
-            tmp = ((buf[12 + 3] >> 2) & 0x1F);
-            snprintf(info2, sizeof(info2), "%2ld日 ", tmp);
-            strcat(info, info2);
-
-            tmp = ((buf[12 + 3] << 3 ) & 0x18);
-            tmp = tmp + ((buf[12 + 4] >> 5) & 0x7);
-            snprintf(info2, sizeof(info2), "%02ld:", tmp);
-            strcat(info, info2);
-
-            tmp = (buf[12 + 4] & 0x1F);
-            tmp = (tmp << 1) + ((buf[12 + 5] >> 7) & 0x01);
-            snprintf(info2, sizeof(info2), "%02ld\n", tmp);
-            strcat(info, info2);
-            serial.printf("%s", info);
-
-            tmp = (buf[12 + 5] & 0x7F);
-            tmp = (tmp << 8) + buf[12 + 6];
-            tmp = (tmp << 3) + ((buf[12 + 7] & 0xE0) >> 5);
-            snprintf(info, sizeof(info), "残高%5ld円, ", tmp);
-
-            tmp = buf[12 + 7] & 0x1F;
-            tmp = (tmp << 8) + buf[12 + 8];
-            tmp = (tmp << 5) + ((buf[12 + 9] & 0xF8) >> 3);
-            if (tmp != 0) {
-                snprintf(info2, sizeof(info2), "利用額%5ld円", tmp);
-                strcat(info, info2);
-            }
-
-            tmp = buf[12 + 9] & 0x07;
-            tmp = (tmp << 8) + buf[12 + 10];
-            tmp = (tmp << 6) + ((buf[12 + 11] & 0xFC) >> 2);
-            if (tmp != 0) {
-                snprintf(info2, sizeof(info2), "チャージ額%5ld円", tmp);
-                strcat(info, info2);
-            }
-            snprintf(info2, sizeof(info2), "\n");
-            strcat(info, info2);
-            serial.printf("%s", info);
-
-            snprintf(info, sizeof(info), "利用種別: ");
+            snprintf(info, sizeof(info), "種別: ");
             tmp = buf[12 + 1];
             switch (tmp) {
                 case 0x04:
@@ -668,18 +696,69 @@ void parse_history_waon(uint8_t *buf)
                     snprintf(info2, sizeof(info2), "ポイント交換(預入)");
                     break;
             }
-            strcat(info, info2);                
-            snprintf(info2, sizeof(info2), "\n");
-            strcat(info, info2);                
+            strcat(info, info2);
+            serial.printf("%s\n", info);
+            tp.printf("%s\r", info);
+
+            tmp = buf[12 + 2];
+            tmp = ((tmp >> 3) & 0x1F) + 2005;
+            snprintf(info, sizeof(info), "日時: %ld年", tmp);
+
+            tmp = buf[12 + 2];
+            tmp = ((tmp & 0x7) << 1) + ((buf[12 + 3] >> 7 ) & 0x01);
+            snprintf(info2, sizeof(info2), "%2ld月", tmp);
+            strcat(info, info2);
+
+            tmp = ((buf[12 + 3] >> 2) & 0x1F);
+            snprintf(info2, sizeof(info2), "%2ld日 ", tmp);
+            strcat(info, info2);
+
+            tmp = ((buf[12 + 3] << 3 ) & 0x18);
+            tmp = tmp + ((buf[12 + 4] >> 5) & 0x7);
+            snprintf(info2, sizeof(info2), "%02ld:", tmp);
+            strcat(info, info2);
+
+            tmp = (buf[12 + 4] & 0x1F);
+            tmp = (tmp << 1) + ((buf[12 + 5] >> 7) & 0x01);
+            snprintf(info2, sizeof(info2), "%02ld\r", tmp);
+            strcat(info, info2);
             serial.printf("%s", info);
+            tp.printf("%s", info);
+
+            tmp = buf[12 + 7] & 0x1F;
+            tmp = (tmp << 8) + buf[12 + 8];
+            tmp = (tmp << 5) + ((buf[12 + 9] & 0xF8) >> 3);
+            if (tmp != 0) {
+                snprintf(info, sizeof(info), "利用額: %ld円", tmp);
+                serial.printf("%s\n", info);
+                tp.printf("%s\r", info);
+            }
+
+            tmp = buf[12 + 9] & 0x07;
+            tmp = (tmp << 8) + buf[12 + 10];
+            tmp = (tmp << 6) + ((buf[12 + 11] & 0xFC) >> 2);
+            if (tmp != 0) {
+                snprintf(info, sizeof(info), "チャージ額: %ld円", tmp);
+                serial.printf("%s\n", info);
+                tp.printf("%s\r", info);
+            }
+
+            tmp = (buf[12 + 5] & 0x7F);
+            tmp = (tmp << 8) + buf[12 + 6];
+            tmp = (tmp << 3) + ((buf[12 + 7] & 0xE0) >> 5);
+            snprintf(info, sizeof(info), "残高: %ld円", tmp);
+            serial.printf("%s\n", info);
+            tp.printf("%s\r\r", info);
+
         }
     }
     if (requestService(WAON_SERVICE_CODE2) && readEncryption(WAON_SERVICE_CODE2, 0, buf)) {
         tmp = buf[12 + 0];
         tmp = (tmp << 8) + buf[12 + 1];
         tmp = (tmp << 8) + buf[12 + 2];
-        snprintf(info, sizeof(info), "\n20%x年%x月%x日 ポイント残高 %ldpt\n", buf[12 + 11], buf[12 + 12], buf[12 + 13], tmp);
+        snprintf(info, sizeof(info), "\r20%x年%x月%x日 ポイント残高 %ldpt\r", buf[12 + 11], buf[12 + 12], buf[12 + 13], tmp);
         serial.printf("%s", info);
+        tp.printf("%s", info);
     }
 }
 
@@ -688,14 +767,14 @@ void parse_history_edy(uint8_t *buf)
     char info[100], info2[30];
     uint32_t tmp;
 
-    tmp = buf[12+4];
-    int day = (((tmp << 8) + buf[12+5]) >> 1);
+    tmp = buf[4];
+    int day = (((tmp << 8) + buf[5]) >> 1);
     if (day == 0) {
         return;
     }
-    int sec = ((buf[12+5]&1) << 16) + (buf[12+6] << 8) + buf[12+7];
+    int sec = ((buf[5]&1) << 16) + (buf[6] << 8) + buf[7];
 
-    struct tm tm, *tp;
+    struct tm tm, *pt;
     time_t t = (time_t)(-1);
     tm.tm_year = 2000 - 1900;
     tm.tm_mon = 1 - 1;
@@ -704,44 +783,50 @@ void parse_history_edy(uint8_t *buf)
     tm.tm_min = 0;
     tm.tm_sec = sec;
     t = mktime(&tm);
-    tp = localtime(&t);
+    pt = localtime(&t);
     
     snprintf(info, sizeof(info), "-----\n");
     serial.printf("%s", info);
+    tp.printf("\r");
 
-    snprintf(info, sizeof(info), "利用日時: %d年%d月%d日 %02d:%02d:%02d\n", tp->tm_year+1900, tp->tm_mon+1, tp->tm_mday, tp->tm_hour, tp->tm_min, tp->tm_sec);
-    serial.printf("%s", info);
-
-    switch(buf[12]) {
+    snprintf(info, sizeof(info), "種別: ");
+    switch(buf[0]) {
         case 0x02:
-            snprintf(info, sizeof(info), "チャージ ");
+            snprintf(info2, sizeof(info2), "チャージ ");
             break;
         case 0x04:
-            snprintf(info, sizeof(info), "バリューチャージ ");
+            snprintf(info2, sizeof(info2), "バリューチャージ ");
             break;
         case 0x20:
-            snprintf(info, sizeof(info), "支払い ");
+            snprintf(info2, sizeof(info2), "支払い ");
             break;
         default:
-            snprintf(info, sizeof(info), "不明(%d) ", buf[12]);
+            snprintf(info2, sizeof(info2), "不明(%d) ", buf[12]);
             break;
     }
-    
-    tmp = buf[12 + 8];
-    tmp = (tmp << 8) + buf[12 + 9];
-    tmp = (tmp << 8) + buf[12 + 10];
-    tmp = (tmp << 8) + buf[12 + 11];
-    snprintf(info2, sizeof(info2), "%ld円 ", tmp);
     strcat(info, info2);
+    serial.printf("%s\n", info);
+    tp.printf("%s\r", info);
     
-    tmp = buf[12 + 12];
-    tmp = (tmp << 8) + buf[12 + 13];
-    tmp = (tmp << 8) + buf[12 + 14];
-    tmp = (tmp << 8) + buf[12 + 15];
-    snprintf(info2, sizeof(info2), "（残高 %ld円）\n", tmp);
-    strcat(info, info2);
+    snprintf(info, sizeof(info), "利用日時: %d年%d月%d日 %02d:%02d", pt->tm_year+1900, pt->tm_mon+1, pt->tm_mday, pt->tm_hour, pt->tm_min);
+    serial.printf("%s\n", info);
+    tp.printf("%s\r", info);
 
-    serial.printf("%s", info);
+    tmp = buf[8];
+    tmp = (tmp << 8) + buf[9];
+    tmp = (tmp << 8) + buf[10];
+    tmp = (tmp << 8) + buf[11];
+    snprintf(info, sizeof(info), "利用額: %ld円", tmp);
+    serial.printf("%s\n", info);
+    tp.printf("%s\r", info);
+    
+    tmp = buf[12];
+    tmp = (tmp << 8) + buf[13];
+    tmp = (tmp << 8) + buf[14];
+    tmp = (tmp << 8) + buf[15];
+    snprintf(info, sizeof(info), "残高: %ld円", tmp);
+    serial.printf("%s\n", info);
+    tp.printf("%s\r\r", info);
 }
 
 int requestService(uint16_t serviceCode){

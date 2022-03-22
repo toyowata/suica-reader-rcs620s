@@ -280,7 +280,7 @@ int main()
 
 void parse_history_suica(uint8_t *buf)
 {
-    char info[80+40], info2[40+40];
+    char info[80+80+4], info2[40+40];
     int region_in, region_out, line_in, line_out, station_in, station_out;
 
     region_in = (buf[0xf] >> 6) & 3;
@@ -485,7 +485,8 @@ void parse_history_suica(uint8_t *buf)
                 break;
             case 0x17:
             case 0x1D:
-                strcat(info, "乗継割引");
+                strcat(info, "乗継割引\r");
+                hasStationName = 2;
                 break;
             case 0x21:
                 strcat(info, "バス等乗継割引");

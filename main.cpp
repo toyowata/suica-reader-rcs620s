@@ -561,6 +561,9 @@ void parse_history_nanaco(uint8_t *buf)
     if (buf[12] == 0x6F || buf[12] == 0x70) {
         strcat(info, "チャージ");
     }
+    if (buf[12] == 0x7A) {
+        strcat(info, "新規");
+    }
     if (buf[12] == 0x83) {
         strcat(info, "ポイント交換チャージ");
     }

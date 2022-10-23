@@ -22,6 +22,7 @@
 #define CYBERNE_SYSTEM_CODE           0x0003
 #define COMMON_SYSTEM_CODE            0xFE00
 #define PASSNET_SERVICE_CODE          0x090F
+#define FELICA_ATTRIBUTE_CODE         0x008B
 
 #define EDY_ATTRIBUTE_CODE            0x110B
 #define EDY_SERVICE_CODE              0x1317
@@ -53,7 +54,7 @@ void get_station_name(char *buf, int area, int line, int station);
 const uint32_t record_length = (3 + 40 + 40);
 
 DigitalOut led(LED1);
-USBSerial serial(true);
+USBSerial serial(false);
 SB1602E lcd(I2C_LCD_SDA, I2C_LCD_SCL);
 RCS620S rcs620s(RCS620S_TX, RCS620S_RX);
 AS289R2 tp(AS289R2_TX, AS289R2_RX);
@@ -62,17 +63,27 @@ int main()
 {
     uint8_t buffer[20][16];
     uint8_t idm[8];
-    
-    //serial.init();
-    //serial.connect();
+    DigitalIn mode(BOOT_PIN, PullUp);
 
     lcd.setCharsInLine(8);
     lcd.clear();
     lcd.contrast(0x35);
+
+    ThisThread::sleep_for(2000ms);
+
+    if (mode.read() == 0) {
+        lcd.printf(0, 0, (char*)"Waiting");
+        lcd.printf(0, 1, (char*)"USB...");
+        serial.init();
+        serial.connect();
+        while(serial.connected() == false) {
+            ThisThread::sleep_for(10ms);
+        }
+    }
+
     lcd.printf(0, 0, (char*)"FeliCa");
     lcd.printf(0, 1, (char*)"Reader");
 
-    ThisThread::sleep_for(500ms);
     serial.printf("\n*** RCS620S FeliCaリーダープログラム ***\n\n");
 
     rcs620s.initDevice();
@@ -352,6 +363,7 @@ void parse_history_suica(uint8_t *buf)
             strcat(info, "ビューアルッテ端末\r");
             break;
         case 0xc7:
+        case 0xc9:
             strcat(info, "物販端末\r");
             break;
         case 0xc8:

@@ -1,0 +1,8 @@
+{
+    "TINY2040": {
+        "inherits": ["RASPBERRY_PI_PICO"]
+    },
+    "QT_PY_RP2040": {
+        "inherits": ["RASPBERRY_PI_PICO"]
+    }
+}

@@ -12,7 +12,26 @@
             "AS289R2-TX"                                : "p4",
             "AS289R2-RX"                                : "p5",
             "LCD-SCL"                                   : "p15",
-            "LCD-SDA"                                   : "p14"
+            "LCD-SDA"                                   : "p14",
+            "BOOT"                                      : "p21"
+        },
+        "TINY2040": {
+            "RCS620S-TX"                                : "p0",
+            "RCS620S-RX"                                : "p1",
+            "AS289R2-TX"                                : "NC",
+            "AS289R2-RX"                                : "NC",
+            "LCD-SCL"                                   : "p27",
+            "LCD-SDA"                                   : "p26",
+            "BOOT"                                      : "p23"
+        },
+        "QT_PY_RP2040": {
+            "RCS620S-TX"                                : "p28",
+            "RCS620S-RX"                                : "p29",
+            "AS289R2-TX"                                : "NC",
+            "AS289R2-RX"                                : "NC",
+            "LCD-SCL"                                   : "p25",
+            "LCD-SDA"                                   : "p24",
+            "BOOT"                                      : "p21"
         },
         "SSCI824": {
             "platform.stdio-baud-rate"                  : 9600,
@@ -52,6 +71,11 @@
             "help"      : "I2C character LCD SDA pin name",
             "value"     : "SDA",
             "macro_name": "I2C_LCD_SDA"
+        },
+        "BOOT": {
+            "help"      : "Boot pin name",
+            "value"     : "NC",
+            "macro_name": "BOOT_PIN"            
         }
     }
 }

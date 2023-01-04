@@ -32,13 +32,6 @@
             "LCD-SCL"                                   : "p25",
             "LCD-SDA"                                   : "p24",
             "BOOT"                                      : "p21"
-        },
-        "SSCI824": {
-            "platform.stdio-baud-rate"                  : 9600,
-            "RCS620S-TX"                                : "dp16",
-            "RCS620S-RX"                                : "P0_15",
-            "AS289R2-TX"                                : "dp17",
-            "AS289R2-RX"                                : "dp18"
         }
     },
     "config": {

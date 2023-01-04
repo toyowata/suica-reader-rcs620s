@@ -1,5 +1,5 @@
 /* mbed Microcontroller Library
- * Copyright (c) 2019-2022 ARM Limited
+ * Copyright (c) 2019-2023 ARM Limited
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -23,6 +23,10 @@
 #define COMMON_SYSTEM_CODE            0xFE00
 #define PASSNET_SERVICE_CODE          0x090F
 #define FELICA_ATTRIBUTE_CODE         0x008B
+#define KITACA_SERVICE_CODE           0x208B
+#define TOICA_SERVICE_CODE            0x1E8B
+#define GATE_SERVICE_CODE             0x184B
+#define PASMO_SERVICE_CODE            0x1cc8
 
 #define EDY_ATTRIBUTE_CODE            0x110B
 #define EDY_SERVICE_CODE              0x1317
@@ -63,6 +67,8 @@ int main()
 {
     uint8_t buffer[20][16];
     uint8_t idm[8];
+    uint8_t attr[RCS620S_MAX_CARD_RESPONSE_LEN];
+
     DigitalIn mode(BOOT_PIN, PullUp);
 
     lcd.setCharsInLine(8);
@@ -99,11 +105,11 @@ int main()
         rcs620s.timeout = COMMAND_TIMEOUT;
         
         // サイバネ領域
-        if (rcs620s.polling(CYBERNE_SYSTEM_CODE)){
-            // Suica or PASMO
-            if (requestService(PASSNET_SERVICE_CODE)){
+        if (rcs620s.polling(CYBERNE_SYSTEM_CODE)) {
+            // Suica, PASMO等の交通系ICカード
+            if (requestService(PASSNET_SERVICE_CODE)) {
                 for (int i = 0; i < 20; i++) {
-                    if (readEncryption(PASSNET_SERVICE_CODE, i, buf)){
+                    if (readEncryption(PASSNET_SERVICE_CODE, i, buf)) {
                         memcpy(buffer[i], &buf[12], 16);
                     }
                 }
@@ -123,11 +129,39 @@ int main()
                 }
             }
             if (isCaptured) {
-                // 残高表示 (Suica or PASMO)
+                if (requestService(FELICA_ATTRIBUTE_CODE)) {
+                    readEncryption(FELICA_ATTRIBUTE_CODE, 0, attr);
+                }
+
+                // 残高取得
                 balance = buffer[0][11];                  // 11 byte目
                 balance = (balance << 8) + buffer[0][10]; // 10 byte目
+
+                // カード種別
+                char card[8];
+                if ((attr[12+8] & 0xF0) == 0x30) {
+                    strcpy(card, "ICOCA");
+                }
+                else {
+                    if (requestService(KITACA_SERVICE_CODE)) {
+                        strcpy(card, "Kitaca");
+                    }
+                    else if (requestService(TOICA_SERVICE_CODE)) {
+                        strcpy(card, "toica");
+                    }
+                    else if (requestService(GATE_SERVICE_CODE) != 1) {
+                        strcpy(card, "SUGOCA");
+                    }
+                    else if (requestService(PASMO_SERVICE_CODE)) {
+                        strcpy(card, "PASMO");
+                    }                    
+                    else {
+                        strcpy(card, "Suica");
+                    }
+                }
+
                 // 残高表示
-                printBalanceLCD("Suica", balance);
+                printBalanceLCD(card , balance);
                 for (int i = (PRINT_ENTRIES - 1); i >= 0; i--) {
                     if (buffer[i][0] != 0) {
                         parse_history_suica(&buffer[i][0]);
@@ -416,6 +450,7 @@ void parse_history_suica(uint8_t *buf)
             hasStationName = 2;
             break;
         case 0x14:
+        case 0x15:
             strcat(info, "オートチャージ");
             break;
         case 0x46:

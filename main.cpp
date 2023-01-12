@@ -27,6 +27,8 @@
 #define TOICA_SERVICE_CODE            0x1E8B
 #define GATE_SERVICE_CODE             0x184B
 #define PASMO_SERVICE_CODE            0x1cc8
+#define SUGOCA_SERVICE_CODE           0x21c8
+#define PITAPA_SERVICE_CODE           0x1b88
 
 #define EDY_ATTRIBUTE_CODE            0x110B
 #define EDY_SERVICE_CODE              0x1317
@@ -134,10 +136,10 @@ int main()
                 }
 
                 // 残高取得
-                balance = buffer[0][11];                  // 11 byte目
-                balance = (balance << 8) + buffer[0][10]; // 10 byte目
+                balance = attr[12+12];                  // 12 byte目
+                balance = (balance << 8) + attr[12+11]; // 11 byte目
 
-                // カード種別
+                // カード種別判定
                 char card[8];
                 if ((attr[12+8] & 0xF0) == 0x30) {
                     strcpy(card, "ICOCA");
@@ -149,8 +151,11 @@ int main()
                     else if (requestService(TOICA_SERVICE_CODE)) {
                         strcpy(card, "toica");
                     }
-                    else if (requestService(GATE_SERVICE_CODE) != 1) {
+                    else if (requestService(SUGOCA_SERVICE_CODE)) {
                         strcpy(card, "SUGOCA");
+                    }
+                    else if (requestService(PITAPA_SERVICE_CODE)) {
+                        strcpy(card, "PiTaPa");
                     }
                     else if (requestService(PASMO_SERVICE_CODE)) {
                         strcpy(card, "PASMO");
@@ -162,6 +167,8 @@ int main()
 
                 // 残高表示
                 printBalanceLCD(card , balance);
+
+                // 履歴表示
                 for (int i = (PRINT_ENTRIES - 1); i >= 0; i--) {
                     if (buffer[i][0] != 0) {
                         parse_history_suica(&buffer[i][0]);
@@ -434,8 +441,14 @@ void parse_history_suica(uint8_t *buf)
             strcat(info, "窓口精算");
             break;
         case 0x07:
-            strcat(info, "新規\r");
-            hasStationName = 1;
+            strcat(info, "新規");
+            if (line_in == 0 && station_in == 0) {
+                hasStationName = 0;
+            }
+            else {
+                strcat(info, "\r");
+                hasStationName = 1;
+            }
             break;
         case 0x08:
             strcat(info, "チャージ控除");

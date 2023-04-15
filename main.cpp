@@ -19,8 +19,9 @@
 #define RCS620S_MAX_CARD_RESPONSE_LEN 30
  
 // FeliCa Service/System Code
-#define CYBERNE_SYSTEM_CODE           0x0003
-#define COMMON_SYSTEM_CODE            0xFE00
+#define CYBERNE_SYSTEM_CODE           0x0300
+#define SAPICA_SYSTEM_CODE            0x5E86
+#define COMMON_SYSTEM_CODE            0x00FE
 #define PASSNET_SERVICE_CODE          0x090F
 #define FELICA_ATTRIBUTE_CODE         0x008B
 #define KITACA_SERVICE_CODE           0x208B
@@ -29,6 +30,9 @@
 #define PASMO_SERVICE_CODE            0x1cc8
 #define SUGOCA_SERVICE_CODE           0x21c8
 #define PITAPA_SERVICE_CODE           0x1b88
+#define SAPICA_SERVICE_CODE           0xBA4B
+#define SUICA_SERVICE_CODE            0x23CB
+#define MANACA_SERVICE_CODE           0x9888
 
 #define EDY_ATTRIBUTE_CODE            0x110B
 #define EDY_SERVICE_CODE              0x1317
@@ -107,7 +111,7 @@ int main()
         rcs620s.timeout = COMMAND_TIMEOUT;
         
         // サイバネ領域
-        if (rcs620s.polling(CYBERNE_SYSTEM_CODE)) {
+        if (rcs620s.polling(CYBERNE_SYSTEM_CODE) || rcs620s.polling(SAPICA_SYSTEM_CODE)) {
             // Suica, PASMO等の交通系ICカード
             if (requestService(PASSNET_SERVICE_CODE)) {
                 for (int i = 0; i < 20; i++) {
@@ -159,9 +163,18 @@ int main()
                     }
                     else if (requestService(PASMO_SERVICE_CODE)) {
                         strcpy(card, "PASMO");
+                    }
+                    else if (requestService(SAPICA_SERVICE_CODE)) {
+                        strcpy(card, "SAPICA");
+                    }
+                    else if (requestService(MANACA_SERVICE_CODE)) {
+                        strcpy(card, "manaca");
+                    }
+                    else if (requestService(SUICA_SERVICE_CODE)) {
+                        strcpy(card, "Suica");
                     }                    
                     else {
-                        strcpy(card, "Suica");
+                        strcpy(card, "W-Suica");
                     }
                 }
 

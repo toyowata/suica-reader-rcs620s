@@ -92,8 +92,8 @@ int RCS620S::polling(uint16_t systemCode)
 
     /* InListPassiveTarget */
     memcpy(buf, "\xd4\x4a\x01\x01\x00\xff\xff\x00\x00", 9);
-    buf[5] = (uint8_t)((systemCode >> 8) & 0xff);
-    buf[6] = (uint8_t)((systemCode >> 0) & 0xff);
+    buf[6] = (uint8_t)((systemCode >> 8) & 0xff);
+    buf[5] = (uint8_t)((systemCode >> 0) & 0xff);
 
     ret = rwCommand(buf, 9, response, &responseLen);
 

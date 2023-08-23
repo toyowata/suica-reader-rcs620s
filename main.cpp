@@ -547,6 +547,10 @@ void parse_history_suica(uint8_t *buf)
                 strcat(info, "定期出場\r");
                 hasStationName = 2;
                 break;
+            case 0x05:
+                strcat(info, "入場乗継\r");
+                hasStationName = 2;
+                break;
             case 0x0E:
                 strcat(info, "窓口出場");
                 break;
@@ -633,6 +637,9 @@ void parse_history_nanaco(uint8_t *buf)
     }
     if (buf[12] == 0x6F || buf[12] == 0x70) {
         strcat(info, "チャージ");
+    }
+    if (buf[12] == 0x77) {
+        strcat(info, "オートチャージ");
     }
     if (buf[12] == 0x7A) {
         strcat(info, "新規");

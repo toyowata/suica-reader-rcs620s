@@ -33,6 +33,8 @@
 #define SAPICA_SERVICE_CODE           0xBA4B
 #define SUICA_SERVICE_CODE            0x23CB
 #define MANACA_SERVICE_CODE           0x9888
+#define NIMOCA_SERVICE_CODE           0x1F48
+#define AOPASS_SERVICE_CODE           0x2888
 
 #define EDY_ATTRIBUTE_CODE            0x110B
 #define EDY_SERVICE_CODE              0x1317
@@ -169,6 +171,12 @@ int main()
                     }
                     else if (requestService(MANACA_SERVICE_CODE)) {
                         strcpy(card, "manaca");
+                    }
+                    else if (requestService(NIMOCA_SERVICE_CODE)) {
+                        strcpy(card, "nimoca");
+                    }
+                    else if (requestService(AOPASS_SERVICE_CODE)) {
+                        strcpy(card, "AOPASS");
                     }
                     else if (requestService(SUICA_SERVICE_CODE)) {
                         strcpy(card, "Suica");
@@ -351,8 +359,8 @@ void parse_history_suica(uint8_t *buf)
     region_in = (buf[0xf] >> 6) & 3;
     region_out = (buf[0xf] >> 4) & 3;
     line_in = buf[6];
-    line_out = buf[8];
     station_in = buf[7];
+    line_out = buf[8];
     station_out = buf[9];
 
     serial.printf("\n");
@@ -408,6 +416,9 @@ void parse_history_suica(uint8_t *buf)
             break;
         case 0x1F:
             strcat(info, "簡易入金機\r");
+            break;
+        case 0x22:
+            strcat(info, "窓口処理機\r");
             break;
         case 0x23:
             strcat(info, "乗継精算機\r");

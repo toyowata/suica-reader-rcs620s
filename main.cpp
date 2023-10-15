@@ -61,7 +61,8 @@ void parse_history_suica(uint8_t *buf);
 void parse_history_nanaco(uint8_t *buf);
 void parse_history_waon(uint8_t *buf);
 void parse_history_edy(uint8_t *buf);
-void get_station_name(char *buf, int area, int line, int station);
+int get_station_name(char *buf, int area, int line, int station);
+void get_bus_name(char *buf, int code);
 
 const uint32_t record_length = (3 + 40 + 40);
 
@@ -480,7 +481,8 @@ void parse_history_suica(uint8_t *buf)
         case 0x0C:
         case 0x0D:
         case 0x0F:
-            strcat(info, "バス/路面等");
+            strcat(info, "バス/路面等\r");
+            get_bus_name(info, ((line_in << 8) | station_in));
             break;
         case 0x13:
             strcat(info, "支払い（新幹線利用）\r");
@@ -501,7 +503,9 @@ void parse_history_suica(uint8_t *buf)
             break;
     }
     if (hasStationName >= 1) {
-        get_station_name(info2, region_in, line_in, station_in);
+        if (get_station_name(info2, region_in, line_in, station_in) != 0) {
+            get_bus_name(info2, ((line_in << 8) | station_in));
+        }
         strcat(info, info2);
     }
     if (hasStationName == 2) {
@@ -975,13 +979,15 @@ void printBalanceLCD(const char *card_name, uint32_t balance)
     lcd.printf(0, 1, (char*)"\\ %d", balance);
 }
 
-void get_station_name(char *buf, int area, int line, int station) {
+int get_station_name(char *buf, int area, int line, int station) {
     unsigned int offset = 0;
+    int ret = 0;
     while (1) {
         if (sc_utf8[0 + offset] == area &&
             sc_utf8[1 + offset] == line &&
             sc_utf8[2 + offset] == station) {
             snprintf(buf, 80, "%s線 %s駅", &sc_utf8[3 + offset], &sc_utf8[3 + 40 + offset]);
+            ret = 0;
             break;
         }
         else {
@@ -989,8 +995,26 @@ void get_station_name(char *buf, int area, int line, int station) {
         }
 
         if (offset >= sc_utf8_len) {
-            snprintf(buf, 80, "***");
+            ret = -1;
             break;
         }
+    }
+    return ret;
+}
+
+void get_bus_name(char *buf, int code) {
+    switch(code) {
+        case 0x090C:
+            strcat(buf, "函館バス");
+            break;
+        case 0x0C85:
+            strcat(buf, "東急世田谷線");
+            break;
+        case 0xA001:
+            strcat(buf, "西鉄バス");
+            break;
+        default:
+            strcat(buf, "不明");
+            break;
     }
 }

@@ -10,18 +10,20 @@
 #include "SB1602E.h"
 #include "RCS620S.h"
 #include "AS289R2.h"
+#include "AS289R2_stub.h"
 #include "sc_utf8.h"
 
 // RCS620S
 #define PUSH_TIMEOUT                  2100
 #define COMMAND_TIMEOUT               400
 #define POLLING_INTERVAL              500ms
-#define RCS620S_MAX_CARD_RESPONSE_LEN 30
+#define RCS620S_MAX_CARD_BUFFER_LEN   30
  
 // FeliCa Service/System Code
 #define CYBERNE_SYSTEM_CODE           0x0300
 #define SAPICA_SYSTEM_CODE            0x5E86
 #define COMMON_SYSTEM_CODE            0x00FE
+#define ECOMYCA_SYSTEM_CODE           0x2C83
 #define PASSNET_SERVICE_CODE          0x090F
 #define FELICA_ATTRIBUTE_CODE         0x008B
 #define KITACA_SERVICE_CODE           0x208B
@@ -34,7 +36,13 @@
 #define SUICA_SERVICE_CODE            0x23CB
 #define MANACA_SERVICE_CODE           0x9888
 #define NIMOCA_SERVICE_CODE           0x1F48
-#define AOPASS_SERVICE_CODE           0x2888
+#define SUICA_PLUS_SERVICE_CODE       0x2888
+#define IOCARD_SERVICE_CODE           0x110A
+#define WSUICA_SERVICE_CODE           0x090A
+#define ECOMYCA_SERVICE_CODE0         0x804B
+#define ECOMYCA_SERVICE_CODE1         0x884B
+#define ECOMYCA_SERVICE_CODE2         0x898F
+#define HAYAKAKEN_SERVICE_CODE        0x2448
 
 #define EDY_ATTRIBUTE_CODE            0x110B
 #define EDY_SERVICE_CODE              0x1317
@@ -61,6 +69,7 @@ void parse_history_suica(uint8_t *buf);
 void parse_history_nanaco(uint8_t *buf);
 void parse_history_waon(uint8_t *buf);
 void parse_history_edy(uint8_t *buf);
+void parse_history_ecomyca(uint8_t *buf);
 int get_station_name(char *buf, int area, int line, int station);
 void get_bus_name(char *buf, int code);
 
@@ -70,13 +79,18 @@ DigitalOut led(LED1);
 USBSerial serial(false);
 SB1602E lcd(I2C_LCD_SDA, I2C_LCD_SCL);
 RCS620S rcs620s(RCS620S_TX, RCS620S_RX);
+
+#if USE_AS289R2_PRINTER
 AS289R2 tp(AS289R2_TX, AS289R2_RX);
+#else
+AS289R2_STUB tp(AS289R2_TX, AS289R2_RX);
+#endif
 
 int main()
 {
     uint8_t buffer[20][16];
     uint8_t idm[8];
-    uint8_t attr[RCS620S_MAX_CARD_RESPONSE_LEN];
+    uint8_t attr[RCS620S_MAX_CARD_BUFFER_LEN];
 
     DigitalIn mode(BOOT_PIN, PullUp);
 
@@ -96,8 +110,8 @@ int main()
         }
     }
 
-    lcd.printf(0, 0, (char*)"FeliCa");
-    lcd.printf(0, 1, (char*)"Reader");
+    lcd.printf(0, 0, (char*)"FeliCa  ");
+    lcd.printf(0, 1, (char*)"Reader  ");
 
     serial.printf("\n*** RCS620S FeliCaリーダープログラム ***\n\n");
 
@@ -108,7 +122,7 @@ int main()
 
     while (1) {
         uint32_t balance = 0;
-        uint8_t buf[RCS620S_MAX_CARD_RESPONSE_LEN];
+        uint8_t buf[RCS620S_MAX_CARD_BUFFER_LEN];
         int isCaptured = 0;
         
         rcs620s.timeout = COMMAND_TIMEOUT;
@@ -126,11 +140,9 @@ int main()
                     // カード変更
                     isCaptured = 1;
                     memcpy(idm, buf + 1, 8);
-#if 1
                     char info[40];
                     snprintf(info, sizeof(info), "IDm: %02x%02x-%02x%02x-%02x%02x-%02x%02x", idm[0], idm[1], idm[2], idm[3], idm[4], idm[5], idm[6], idm[7]);
                     serial.printf("%s\n", info);
-#endif
                 }
                 else {
                     // 前と同じカード
@@ -147,7 +159,7 @@ int main()
                 balance = (balance << 8) + attr[12+11]; // 11 byte目
 
                 // カード種別判定
-                char card[8];
+                char card[9];
                 if ((attr[12+8] & 0xF0) == 0x30) {
                     strcpy(card, "ICOCA");
                 }
@@ -176,14 +188,20 @@ int main()
                     else if (requestService(NIMOCA_SERVICE_CODE)) {
                         strcpy(card, "nimoca");
                     }
-                    else if (requestService(AOPASS_SERVICE_CODE)) {
-                        strcpy(card, "AOPASS");
+                    else if (requestService(SUICA_PLUS_SERVICE_CODE)) {
+                        strcpy(card, "Suica+");
                     }
                     else if (requestService(SUICA_SERVICE_CODE)) {
                         strcpy(card, "Suica");
                     }                    
-                    else {
+                    else if (requestService(HAYAKAKEN_SERVICE_CODE)) {
+                        strcpy(card, "Hayaka");
+                    }                    
+                    else if (requestService(WSUICA_SERVICE_CODE)) {
                         strcpy(card, "W-Suica");
+                    }                    
+                    else {
+                        strcpy(card, "Suica-IO");
                     }
                 }
 
@@ -344,6 +362,51 @@ int main()
                 tp.clearDoubleSizeWidth();
                 tp.putLineFeed(3);
 
+            }
+        }
+        if (rcs620s.polling(ECOMYCA_SYSTEM_CODE)) {
+            char info[80];
+            if (requestService(ECOMYCA_SERVICE_CODE0) && readEncryption(ECOMYCA_SERVICE_CODE0, 1, buf)) {
+                if (memcmp(idm, &buf[12 + 8], 8) != 0) {
+                    memcpy(idm, &buf[12 + 8], 8);
+                    isCaptured = 1;
+                }
+                else {
+                    isCaptured = 0;
+                }
+                if (isCaptured) {
+                    serial.printf("\n");
+                    for (int i = 0; i < 16; i++) {
+                        serial.printf("%02X ", buf[12 + i]);
+                    }
+                    serial.printf("\n");
+
+                    snprintf(info, sizeof(info), "カード発行日: %d/%02d/%02d", 2000+(buf[12 + 0]>>1), ((buf[12 + 0]&1)<<3 | ((buf[12 + 1]&0xe0)>>5)), buf[12 + 1]&0x1f);
+                    serial.printf("%s\r", info);
+                    snprintf(info, sizeof(info), "IDm: %02x%02x-%02x%02x", idm[4], idm[5], idm[6], idm[7]);
+                    serial.printf("%s\n", info);
+
+                }
+                
+            }
+
+            if (requestService(ECOMYCA_SERVICE_CODE1) && readEncryption(ECOMYCA_SERVICE_CODE1, 0, buf) && isCaptured) {
+                balance = buf[12 + 1];
+                balance += (buf[12 + 0] << 8);
+                printBalanceLCD("ecomyca", balance);
+            }
+            if (isCaptured) {
+                for (int i = 0; i < 20; i++) {
+                    if (readEncryption(ECOMYCA_SERVICE_CODE2, i, buf)) {
+                        memcpy(buffer[i], &buf[12], 16);
+                    }
+                }
+                // 履歴表示
+                for (int i = (PRINT_ENTRIES - 1); i >= 0; i--) {
+                    if (buffer[i][0] != 0) {
+                        parse_history_ecomyca(&buffer[i][0]);
+                    }
+                }
             }
         }
         rcs620s.rfOff();
@@ -633,16 +696,11 @@ void parse_history_nanaco(uint8_t *buf)
         return;
     }
 
-#if 1
     serial.printf("\n");
-    for (int i = 0; i < RCS620S_MAX_CARD_RESPONSE_LEN-2; i++) {
+    for (int i = 0; i < RCS620S_MAX_CARD_BUFFER_LEN-2; i++) {
         serial.printf("%02X ", buf[i]);
     }
     serial.printf("\n");
-#else
-    serial.printf("-----\n");
-    tp.printf("\r");
-#endif
     snprintf(info, sizeof(info), "種別: ");
     if (buf[12] == 0x35) {
         strcat(info, "引継");
@@ -714,14 +772,6 @@ void parse_history_waon(uint8_t *buf)
     int array[3] = {0, 2, 4};
     uint32_t tmp;
     
-#if 0
-    serial.printf("\n");
-    for (int i = 0; i < RCS620S_MAX_CARD_RESPONSE_LEN-2; i++) {
-        serial.printf("%02X ", buf[i]);
-    }
-    serial.printf("\n");
-#endif
-
     for (int i = 0; i < 3; i += 2) {
         if (readEncryption(WAON_SERVICE_CODE0, i*2, buf)) {
             num[i] = buf[12 + 13];
@@ -928,9 +978,70 @@ void parse_history_edy(uint8_t *buf)
     tp.printf("%s\r\r", info);
 }
 
+void parse_history_ecomyca(uint8_t *buf)
+{
+    char info[80+80+4], info2[40+40];
+
+    serial.printf("\n");
+    for (int i = 0; i < 16; i++) {
+        serial.printf("%02X ", buf[i]);
+    }
+    serial.printf("\n");
+
+    snprintf(info, sizeof(info), "機種種別: ");
+    switch (buf[9] & 0xF0) {
+        case 0x20:
+            strcat(info, "鉄道\r");
+            break;
+        case 0x70:
+            strcat(info, "窓口精算機\r");
+            break;
+        case 0x90:
+            strcat(info, "運賃箱カードリーダー\r");
+            break;
+        default:
+            strcat(info, "不明\r");
+            break;
+    }
+    serial.printf("%s", info);
+
+    snprintf(info, sizeof(info), "処理内容: ");
+    switch (buf[9] & 0x0F) {
+        case 0x00:
+            strcat(info, "新規");
+            break;
+        case 0x02:
+            strcat(info, "支払い");
+            break;
+        default:
+            strcat(info, "不明");
+            break;
+    }
+    serial.printf("%s\r", info);
+    tp.printf("%s\r", info);
+
+    snprintf(info, sizeof(info), "処理日付: %d/%02d/%02d", 2000+(buf[0]>>1), ((buf[0]&1)<<3 | ((buf[1]&0xe0)>>5)), buf[1]&0x1f);
+    snprintf(info2, sizeof(info2), " %02d:%02d", ((buf[2] & 0xfc) >> 2), ((buf[2] & 0x03) << 4) | (buf[3] & 0xf0) >> 4);
+    strcat(info, info2);
+    snprintf(info2, sizeof(info2), " %02d:%02d", (buf[3] & 0x0f) << 2 | ((buf[4] & 0xc0) >> 6), (buf[4] & 0x3f));
+    strcat(info, info2);
+
+    strcat(info, "\r");
+    serial.printf("%s", info);
+    tp.printf("%s", info);
+
+    snprintf(info, sizeof(info), "利用金額: %d円", (buf[0xa]<<8) + buf[0xb]); 
+    serial.printf("%s\n", info);
+    snprintf(info, sizeof(info), "残額: %d円", (buf[0xe]<<8) + buf[0xf]); 
+    serial.printf("%s\n", info);
+    tp.setDoubleSizeWidth();
+    tp.printf("%s\r\r", info);
+    tp.clearDoubleSizeWidth();
+}
+
 int requestService(uint16_t serviceCode){
     int ret;
-    uint8_t buf[RCS620S_MAX_CARD_RESPONSE_LEN];
+    uint8_t buf[RCS620S_MAX_CARD_BUFFER_LEN];
     uint8_t responseLen = 0;
     
     buf[0] = 0x02;
@@ -1006,6 +1117,12 @@ void get_bus_name(char *buf, int code) {
     switch(code) {
         case 0x090C:
             strcat(buf, "函館バス");
+            break;
+        case 0x0C0C:
+            strcat(buf, "関東自動車");
+            break;
+        case 0x0C6B:
+            strcat(buf, "神奈中バス");
             break;
         case 0x0C85:
             strcat(buf, "東急世田谷線");

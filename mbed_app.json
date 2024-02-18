@@ -1,4 +1,7 @@
 {
+    "macros":   [
+        "USE_AS289R2_PRINTER=1"
+    ],
     "target_overrides": {
         "*": {
             "platform.stdio-baud-rate"                  : 115200,

@@ -92,7 +92,7 @@ int main()
     uint8_t idm[8];
     uint8_t attr[RCS620S_MAX_CARD_BUFFER_LEN];
 
-    DigitalIn mode(BOOT_PIN, PullUp);
+    DigitalIn boot_mode(BOOT_PIN, PullUp);
 
     lcd.setCharsInLine(8);
     lcd.clear();
@@ -100,7 +100,7 @@ int main()
 
     ThisThread::sleep_for(2000ms);
 
-    if (mode.read() == 0) {
+    if (boot_mode.read() == 0) {
         lcd.printf(0, 0, (char*)"Waiting");
         lcd.printf(0, 1, (char*)"USB...");
         serial.init();
@@ -1118,6 +1118,9 @@ void get_bus_name(char *buf, int code) {
         case 0x090C:
             strcat(buf, "函館バス");
             break;
+        case 0x090D:
+            strcat(buf, "岩手県交通");
+            break;
         case 0x0C0C:
             strcat(buf, "関東自動車");
             break;
@@ -1126,6 +1129,9 @@ void get_bus_name(char *buf, int code) {
             break;
         case 0x0C85:
             strcat(buf, "東急世田谷線");
+            break;
+        case 0x0C8A:
+            strcat(buf, "JR東日本");
             break;
         case 0xA001:
             strcat(buf, "西鉄バス");

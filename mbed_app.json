@@ -1,6 +1,6 @@
 {
     "macros":   [
-        "USE_AS289R2_PRINTER=1"
+        "USE_AS289R2_PRINTER=0"
     ],
     "target_overrides": {
         "*": {

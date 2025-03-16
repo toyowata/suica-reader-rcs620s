@@ -1,51 +1,102 @@
-# Copyright (c) 2020 ARM Limited. All rights reserved.
-# SPDX-License-Identifier: Apache-2.0
+#
+# Mbed CE Hello World Project
+#
+cmake_minimum_required(VERSION 3.19)
+cmake_policy(VERSION 3.19...3.22)
 
-cmake_minimum_required(VERSION 3.19.0 FATAL_ERROR)
-# enable_language(CXX)
+#### Initialize Mbed OS build system. ####
+######################################################################################################
+### Block of including .json5 files. Files of this block must be included before the app.cmake
 
-set(MBED_APP_JSON_PATH mbed_app.json)
-set(MBED_PATH ${CMAKE_CURRENT_SOURCE_DIR}/mbed-os CACHE INTERNAL "")
-set(MBED_CONFIG_PATH ${CMAKE_CURRENT_BINARY_DIR} CACHE INTERNAL "")
-set(APP_TARGET suica-reader-rcs620s)
+#[[ Set path of mbed_app.json (necessary at all times) ]]
+set(MBED_APP_JSON_PATH mbed_app.json5)
 
-include(mbed-os/tools/cmake/app.cmake)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/SB1602E)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/AS289R2)
+###--------------------------------------------------------------------------------------------------- 
+#[[ This part is dedicated for custom targets only! The settings below activate targets from
+    custom_targets.json5 and upload method config. If custom targets are not used the lines below should be commented. ]]
 
-add_subdirectory(${MBED_PATH})
+#[[ Here set path for custom_targets.json5 (this is our default) ]]
+#set(CUSTOM_TARGETS_JSON_PATH custom_targets/custom_targets.json5)
 
-add_executable(${APP_TARGET})
+#[[ Here you can set path for custom upload config .cmake (optional example) ]]
+#set(CUSTOM_UPLOAD_CFG_PATH ${CMAKE_SOURCE_DIR}/${MBED_TARGET}/${MBED_TARGET}.cmake)
 
-mbed_configure_app_target(${APP_TARGET})
+#[[ Note: For custom target you need also an upload method and we have few options how you can do that
+    - use the variable CUSTOM_UPLOAD_CFG_PATH above to set the location of your config file
+    - use the default expected path for custom targets upload method config file:
+      MY_PROJECT/custom_targets/upload_method_cfg
+    - of course you can set upload method parameters directly via cmake in this file
+   For more visit https://github.com/mbed-ce/mbed-os/wiki/Upload-Methods ]]
+   
+### End of block
+######################################################################################################
 
-project(${APP_TARGET})
+### Include Mbed toolchain setup file
+include(mbed-os/tools/cmake/mbed_toolchain_setup.cmake)
 
-target_sources(${APP_TARGET}
-    PRIVATE
-        main.cpp
+### Set up your project.
+# The project name will be made available in the ${PROJECT_NAME} variable.
+# If you like, you can specify a version here, which CMake will make available in the ${PROJECT_VERSION} variable.
+project(suica-reader-rcs620s
+        # VERSION 1.0.0
+        LANGUAGES C CXX ASM)
+
+### Include Mbed project setup file
+include(mbed_project_setup)
+
+######################################################################################################
+### Block of including project folders
+
+#[[ If using a custom target, the subdirectory containing the custom target must be included before 
+    the mbed-os subdir, otherwise the next line should be commented]]
+#add_subdirectory(custom_targets)
+
+###--------------------------------------------------------------------------------------------------
+## Add mbed-os subdirectory (necessary everytime)
+add_subdirectory(mbed-os)
+add_subdirectory(AS289R2)
+add_subdirectory(SB1602E)
+
+###--------------------------------------------------------------------------------------------------
+## Add another subdirectory, for example subdirectory of a library (if needed)
+#add_subdirectory(YourLibrary)
+
+### End of block
+######################################################################################################
+
+### add executable (necessary everytime)
+# This will compile an elf file named the same as the project with the given source files.
+add_executable(${PROJECT_NAME}
+    main.cpp
+    RCS620S.cpp
 )
 
-target_link_libraries(${APP_TARGET}
-    PRIVATE
-        mbed-os
-        mbed-usb
-        mbed-events
-)
+######################################################################################################
+### Link libraries block
+#[[For more about this configuration visit wiki page MbedOS-configuration
+https://github.com/mbed-ce/mbed-os/wiki/MbedOS-configuration#configuration-via-cmake-files]]
 
-mbed_set_post_build(${APP_TARGET})
-
-option(VERBOSE_BUILD "Have a verbose build process")
-if(VERBOSE_BUILD)
-    set(CMAKE_VERBOSE_MAKEFILE ON)
+# Link Mbed OS core library. This is called mbed-os when using the Mbed RTOS, and mbed-baremetal when using
+# the bare metal version. This if statement checks to see which is in use and links it.
+# Important: The mbed-os and mbed-baremetal libraries are object libraries, so they should ONLY be
+# linked to executables, not to other libraries. Libraries should link to `mbed-core-flags` instead.
+if("MBED_CONF_TARGET_APPLICATION_PROFILE=bare-metal" IN_LIST MBED_CONFIG_DEFINITIONS)
+    target_link_libraries(${PROJECT_NAME} mbed-baremetal)
+else()
+    target_link_libraries(${PROJECT_NAME} mbed-os)
 endif()
 
-if("raspberry_pi_pico" IN_LIST MBED_TARGET_LABELS)
-    add_subdirectory(AS289R2)
-    add_subdirectory(SB1602E)
-    target_link_libraries(suica-reader-rcs620s
-        PRIVATE
-            AS289R2
-            SB1602E
-    )
-endif()
+target_link_libraries(${PROJECT_NAME} AS289R2)
+target_link_libraries(${PROJECT_NAME} SB1602E)
+
+### link user library (if needed)
+#target_link_libraries(${PROJECT_NAME} YourLibrary)
+
+# This generates build rules to generate bin/hex files, and to flash the code if you have configured an
+# upload method.
+mbed_set_post_build(${PROJECT_NAME})
+#[[ Note: if you wish to use a custom linker script instead of the default Mbed one for
+   your target, you can do that with mbed_set_post_build(${PROJECT_NAME} path/to/linker_script.ld) ]]
+
+### End of block
+######################################################################################################

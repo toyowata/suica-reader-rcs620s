@@ -1,0 +1,85 @@
+{
+    "macros":   [
+        "USE_AS289R2_PRINTER=0"
+    ],
+    "target_overrides": {
+        "*": {
+            // By default, use a serial baudrate of 115200 and enable buffering on the serial port.
+            "platform.stdio-baud-rate"                  : 115200,
+            "platform.stdio-convert-newlines"           : true,
+            "platform.stdio-buffered-serial"            : true,
+            "platform.stdio-flush-at-exit"              : true
+
+            // Uncomment to use mbed-baremetal instead of mbed-os
+            // "target.application-profile": "bare-metal"
+        },
+
+        "NUCLEO_F070RB": {
+            "target.application-profile": "bare-metal"
+        },
+        "RASPBERRY_PI_PICO": {
+            "RCS620S-TX"                                : "p16",
+            "RCS620S-RX"                                : "p17",
+            "AS289R2-TX"                                : "p4",
+            "AS289R2-RX"                                : "p5",
+            "LCD-SCL"                                   : "p15",
+            "LCD-SDA"                                   : "p14",
+            "BOOT"                                      : "p21"
+        },
+        "TINY2040": {
+            "RCS620S-TX"                                : "p0",
+            "RCS620S-RX"                                : "p1",
+            "AS289R2-TX"                                : "NC",
+            "AS289R2-RX"                                : "NC",
+            "LCD-SCL"                                   : "p27",
+            "LCD-SDA"                                   : "p26",
+            "BOOT"                                      : "p23"
+        },
+        "QT_PY_RP2040": {
+            "RCS620S-TX"                                : "p28",
+            "RCS620S-RX"                                : "p29",
+            "AS289R2-TX"                                : "NC",
+            "AS289R2-RX"                                : "NC",
+            "LCD-SCL"                                   : "p25",
+            "LCD-SDA"                                   : "p24",
+            "BOOT"                                      : "p21"
+        }
+    },
+    "config": {
+        "RCS620S-TX": {
+            "help"      : "RCS620S TX pin name",
+            "value"     : "D1",
+            "macro_name": "RCS620S_TX"
+        },
+        "RCS620S-RX": {
+            "help"      : "RCS620S TX pin name",
+            "value"     : "D0",
+            "macro_name": "RCS620S_RX"
+        },
+        "AS289R2-TX": {
+            "help"      : "AS289R2 TX pin name",
+            "value"     : "D1",
+            "macro_name": "AS289R2_TX"
+        },
+        "AS289R2-RX": {
+            "help"      : "AS289R2 RX pin name",
+            "value"     : "D0",
+            "macro_name": "AS289R2_RX"
+        },
+        "LCD-SCL": {
+            "help"      : "I2C character LCD SCL pin name",
+            "value"     : "SCL",
+            "macro_name": "I2C_LCD_SCL"
+        },
+        "LCD-SDA": {
+            "help"      : "I2C character LCD SDA pin name",
+            "value"     : "SDA",
+            "macro_name": "I2C_LCD_SDA"
+        },
+        "BOOT": {
+            "help"      : "Boot pin name",
+            "value"     : "NC",
+            "macro_name": "BOOT_PIN"            
+        }
+    }    
+}

@@ -1,6 +1,6 @@
 # suica-reader-rcs620s
 
-<img width="600" src="https://dl.dropboxusercontent.com/s/kfclvg1qqregvnt/IMG_9299.png">
+<img width="600" src="https://drive.google.com/file/d/15XJz1cg0ceiJWWMykvMWO-ecO2avtHCV/view?usp=drivesdk">
 
 FeliCa リーダー・ライターを使用したSuica/PASMO履歴リーダです。
 

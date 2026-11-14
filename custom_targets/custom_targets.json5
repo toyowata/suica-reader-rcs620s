@@ -1,0 +1,10 @@
+{
+    "TINY2040": {
+        "inherits": ["RASPBERRY_PI_PICO"],
+        "device_name": "RP2040"
+    },
+    "QT_PY_RP2040": {
+        "inherits": ["RASPBERRY_PI_PICO"],
+        "device_name": "RP2040"
+    }
+}

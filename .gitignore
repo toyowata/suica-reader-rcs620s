@@ -1,11 +1,25 @@
 .build
 .mbed
+.vscode
+.claude
 projectfiles
-*.py*
 
 cmake_build
 BUILD
 
-AS289R2
-SB1602E
-mbed-os
+AS289R2/
+SB1602E/
+mbed-os/
+
+# ONLY VS Code build dir
+/build/
+
+# VS Code config files
+.vscode/
+cmake-variants.yaml
+
+# Python stuff
+*.pyc
+
+# Mac stuff
+.DS_Store

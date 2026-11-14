@@ -13,36 +13,32 @@
             // Uncomment to use mbed-baremetal instead of mbed-os
             // "target.application-profile": "bare-metal"
         },
-
-        "NUCLEO_F070RB": {
-            "target.application-profile": "bare-metal"
-        },
         "RASPBERRY_PI_PICO": {
-            "RCS620S-TX"                                : "p16",
-            "RCS620S-RX"                                : "p17",
-            "AS289R2-TX"                                : "p4",
-            "AS289R2-RX"                                : "p5",
-            "LCD-SCL"                                   : "p15",
-            "LCD-SDA"                                   : "p14",
-            "BOOT"                                      : "p21"
+            "RCS620S-TX"                                : "IO_16",
+            "RCS620S-RX"                                : "IO_17",
+            "AS289R2-TX"                                : "IO_4",
+            "AS289R2-RX"                                : "IO_5",
+            "LCD-SCL"                                   : "IO_15",
+            "LCD-SDA"                                   : "IO_14",
+            "BOOT"                                      : "IO_21"
         },
         "TINY2040": {
-            "RCS620S-TX"                                : "p0",
-            "RCS620S-RX"                                : "p1",
-            "AS289R2-TX"                                : "NC",
-            "AS289R2-RX"                                : "NC",
-            "LCD-SCL"                                   : "p27",
-            "LCD-SDA"                                   : "p26",
-            "BOOT"                                      : "p23"
+            "RCS620S-TX"                                : "IO_0",
+            "RCS620S-RX"                                : "IO_1",
+            "AS289R2-TX"                                : "IO_4",
+            "AS289R2-RX"                                : "IO_5",
+            "LCD-SCL"                                   : "IO_27",
+            "LCD-SDA"                                   : "IO_26",
+            "BOOT"                                      : "IO_23"
         },
         "QT_PY_RP2040": {
-            "RCS620S-TX"                                : "p28",
-            "RCS620S-RX"                                : "p29",
+            "RCS620S-TX"                                : "IO_28",
+            "RCS620S-RX"                                : "IO_29",
             "AS289R2-TX"                                : "NC",
             "AS289R2-RX"                                : "NC",
-            "LCD-SCL"                                   : "p25",
-            "LCD-SDA"                                   : "p24",
-            "BOOT"                                      : "p21"
+            "LCD-SCL"                                   : "IO_25",
+            "LCD-SDA"                                   : "IO_24",
+            "BOOT"                                      : "IO_21"
         }
     },
     "config": {

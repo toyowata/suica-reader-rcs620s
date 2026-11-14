@@ -22,6 +22,7 @@
 // FeliCa Service/System Code
 #define CYBERNE_SYSTEM_CODE           0x0300
 #define SAPICA_SYSTEM_CODE            0x5E86
+#define PASPY_SYSTEM_CODE             0x9285
 #define COMMON_SYSTEM_CODE            0x00FE
 #define ECOMYCA_SYSTEM_CODE           0x2C83
 #define PASSNET_SERVICE_CODE          0x090F
@@ -43,6 +44,7 @@
 #define ECOMYCA_SERVICE_CODE1         0x884B
 #define ECOMYCA_SERVICE_CODE2         0x898F
 #define HAYAKAKEN_SERVICE_CODE        0x2448
+#define PASPY_SERVICE_CODE            0xB00B
 
 #define EDY_ATTRIBUTE_CODE            0x110B
 #define EDY_SERVICE_CODE              0x1317
@@ -75,7 +77,14 @@ void get_bus_name(char *buf, int code);
 
 const uint32_t record_length = (3 + 40 + 40);
 
+#if defined(TARGET_TINY2040)
+DigitalOut led(IO_18);
+DigitalOut LED_B(IO_20, 1);
+DigitalOut LED_G(IO_19, 1);
+#else
 DigitalOut led(LED1);
+#endif
+
 USBSerial serial(false);
 SB1602E lcd(I2C_LCD_SDA, I2C_LCD_SCL);
 RCS620S rcs620s(RCS620S_TX, RCS620S_RX);
@@ -128,7 +137,7 @@ int main()
         rcs620s.timeout = COMMAND_TIMEOUT;
         
         // サイバネ領域
-        if (rcs620s.polling(CYBERNE_SYSTEM_CODE) || rcs620s.polling(SAPICA_SYSTEM_CODE)) {
+        if (rcs620s.polling(CYBERNE_SYSTEM_CODE) || rcs620s.polling(SAPICA_SYSTEM_CODE) || rcs620s.polling(PASPY_SYSTEM_CODE)) {
             // Suica, PASMO等の交通系ICカード
             if (requestService(PASSNET_SERVICE_CODE)) {
                 for (int i = 0; i < 20; i++) {
@@ -197,6 +206,9 @@ int main()
                     else if (requestService(HAYAKAKEN_SERVICE_CODE)) {
                         strcpy(card, "Hayaka");
                     }                    
+                    else if (requestService(PASPY_SERVICE_CODE)) {
+                        strcpy(card, "PASPY");
+                    }
                     else if (requestService(WSUICA_SERVICE_CODE)) {
                         strcpy(card, "W-Suica");
                     }                    

@@ -16,10 +16,10 @@ set(MBED_APP_JSON_PATH mbed_app.json5)
     custom_targets.json5 and upload method config. If custom targets are not used the lines below should be commented. ]]
 
 #[[ Here set path for custom_targets.json5 (this is our default) ]]
-#set(CUSTOM_TARGETS_JSON_PATH custom_targets/custom_targets.json5)
+set(CUSTOM_TARGETS_JSON_PATH custom_targets/custom_targets.json5)
 
 #[[ Here you can set path for custom upload config .cmake (optional example) ]]
-#set(CUSTOM_UPLOAD_CFG_PATH ${CMAKE_SOURCE_DIR}/${MBED_TARGET}/${MBED_TARGET}.cmake)
+set(CUSTOM_UPLOAD_CFG_PATH custom_targets/CustomUploadMethods.cmake)
 
 #[[ Note: For custom target you need also an upload method and we have few options how you can do that
     - use the variable CUSTOM_UPLOAD_CFG_PATH above to set the location of your config file
@@ -49,7 +49,12 @@ include(mbed_project_setup)
 
 #[[ If using a custom target, the subdirectory containing the custom target must be included before 
     the mbed-os subdir, otherwise the next line should be commented]]
-#add_subdirectory(custom_targets)
+add_subdirectory(custom_targets)
+
+#[[ Custom RP2040 targets are not known to mbed-os, so specify the Pico SDK board header here ]]
+if(MBED_TARGET STREQUAL "TINY2040" OR MBED_TARGET STREQUAL "QT_PY_RP2040")
+    set(MBED_PICO_CONFIG_HEADER_FILE boards/pico.h)
+endif()
 
 ###--------------------------------------------------------------------------------------------------
 ## Add mbed-os subdirectory (necessary everytime)
@@ -86,15 +91,22 @@ else()
     target_link_libraries(${PROJECT_NAME} mbed-os)
 endif()
 
+### link user library (if needed)
 target_link_libraries(${PROJECT_NAME} AS289R2)
 target_link_libraries(${PROJECT_NAME} SB1602E)
-
-### link user library (if needed)
-#target_link_libraries(${PROJECT_NAME} YourLibrary)
 
 # This generates build rules to generate bin/hex files, and to flash the code if you have configured an
 # upload method.
 mbed_set_post_build(${PROJECT_NAME})
+
+#[[ Generate a .uf2 file for drag-and-drop programming of RP2040 boards ]]
+if(MCU_RP2040 IN_LIST MBED_TARGET_LABELS)
+    find_program(PICOTOOL picotool REQUIRED)
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${PICOTOOL} uf2 convert $<TARGET_FILE:${PROJECT_NAME}> ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.uf2
+        COMMENT "Generating ${PROJECT_NAME}.uf2"
+        VERBATIM)
+endif()
 #[[ Note: if you wish to use a custom linker script instead of the default Mbed one for
    your target, you can do that with mbed_set_post_build(${PROJECT_NAME} path/to/linker_script.ld) ]]
 

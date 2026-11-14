@@ -1,0 +1,10 @@
+[submodule "mbed-os"]
+	path = mbed-os
+	url = https://github.com/mbed-ce/mbed-os.git
+	shallow = true
+[submodule "SB1602E"]
+	path = SB1602E
+	url = https://github.com/toyowata/SB1602E.git
+[submodule "AS289R2"]
+	path = AS289R2
+	url = https://github.com/toyowata/AS289R2.git
